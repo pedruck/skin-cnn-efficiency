@@ -34,6 +34,7 @@ src/
   metrics.py           métricas preditivas (sklearn)
   efficiency.py        parâmetros, MACs, latência (b=1 e lote), VRAM, energia
   env.py               captura de ambiente -> environment.json
+  prepare_cache.py     CLI: pré-redimensiona o dataset para 256×256 (opcional)
   train.py             CLI: treina 1 modelo, resumível (checkpoint por época)
   benchmark.py         CLI: avalia no teste + perfila eficiência -> results/*.csv, *.npz
   plots.py             CLI: results/ -> figs/*.pdf (+ .png 300 dpi)
@@ -52,6 +53,24 @@ paper/                 template LaTeX IEEE + refs.bib + figuras do artigo
 
 Treine **um modelo por célula/sessão**. O treino é resumível: se a sessão do Colab
 cair, basta re-executar a mesma célula — ele continua da última época salva no Drive.
+
+## Cache de imagens (opcional, mas recomendado)
+
+O pipeline reduz toda imagem a 256×256 na primeira transformação — o modelo nunca
+vê mais que isso. Refazer esse resize a cada época, em ~25 mil JPEGs de ~1024×768,
+faz do DataLoader o gargalo: a GPU fica esperando o disco e `epoch_time_s` passa a
+medir o **armazenamento** em vez da arquitetura, invalidando a comparação de custo
+de treino. Cachear é só memorizar um cálculo determinístico — o que chega ao modelo
+é o mesmo.
+
+```bash
+python -m src.prepare_cache --data /caminho/isic-2019 --out ~/isic256 --inspect  # vale a pena?
+python -m src.prepare_cache --data /caminho/isic-2019 --out ~/isic256
+python -m src.train --model resnet50 --data ~/isic256
+```
+
+O `--inspect` mostra as dimensões de origem: se já forem ≤ 256, pule o cache.
+A conversão é resumível (re-executar pula o que já foi feito).
 
 ## Como rodar localmente
 

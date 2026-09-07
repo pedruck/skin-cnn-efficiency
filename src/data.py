@@ -111,6 +111,18 @@ def load_or_make_splits(frame: pd.DataFrame, val_frac: float, test_frac: float,
 # Transforms
 # --------------------------------------------------------------------------- #
 def build_transforms(image_size: int, resize_before_crop: int) -> dict:
+    """Treino e avaliacao compartilham o mesmo enquadramento.
+
+    Os dois caminhos fazem ``resize_before_crop`` -> recorte de ``image_size``
+    (aleatorio no treino, central na avaliacao). Avaliar com a imagem inteira
+    reduzida direto a ``image_size`` daria ao modelo um campo de visao mais
+    amplo do que ele viu treinando -- um train/eval mismatch que custa alguns
+    decimos de macro-F1 de graca.
+
+    O ``Resize`` inicial tambem torna o cache de ``src.prepare_cache``
+    transparente: se as imagens ja estao em ``resize_before_crop``, ele nao
+    altera nada e o resultado e identico ao do dataset original.
+    """
     train_tfm = transforms.Compose([
         transforms.Resize((resize_before_crop, resize_before_crop)),
         transforms.RandomCrop(image_size),
@@ -121,7 +133,8 @@ def build_transforms(image_size: int, resize_before_crop: int) -> dict:
         transforms.Normalize(MEAN, STD),
     ])
     eval_tfm = transforms.Compose([
-        transforms.Resize((image_size, image_size)),
+        transforms.Resize((resize_before_crop, resize_before_crop)),
+        transforms.CenterCrop(image_size),
         transforms.ToTensor(),
         transforms.Normalize(MEAN, STD),
     ])
