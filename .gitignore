@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Generated artifacts (regenerate with src.train / src.benchmark / src.plots)
+checkpoints/*
+results/*
+figs/*
+!checkpoints/.gitkeep
+!results/.gitkeep
+!figs/.gitkeep
+
+# Data (never commit the dataset; download it via kagglehub)
+data/
+*.jpg
+*.jpeg
+*.png
+!paper/**/*.png
+!figs/**/*.png
+
+# Misc
+temp.p
+*.zip
+.DS_Store

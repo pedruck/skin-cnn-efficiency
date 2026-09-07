@@ -1,0 +1,49 @@
+# ==========================================================================
+# Configuracao unica do estudo. Todos os scripts (train / benchmark / plots)
+# leem este arquivo. Overrides pontuais via linha de comando (ex.: --epochs).
+# ==========================================================================
+
+seed: 42
+deterministic: false        # true = resultados exatamente reprodutiveis (~10-20% mais lento)
+
+data:
+  dataset_slug: "salviohexia/isic-2019-skin-lesion-images-for-classification"
+  data_dir: null             # preenchido por --data; se null, baixa via kagglehub
+  # ordem fixa das classes (define o indice de cada rotulo em todo o projeto)
+  classes: [MEL, NV, BCC, AK, BKL, DF, VASC, SCC]
+  image_size: 224
+  resize_before_crop: 256
+  val_fraction: 0.15
+  test_fraction: 0.15
+  num_workers: 2
+
+train:
+  epochs: 20
+  batch_size: 32
+  lr: 0.0001
+  weight_decay: 0.01
+  optimizer: adamw
+  scheduler: cosine          # cosine | none
+  warmup_epochs: 1
+  label_smoothing: 0.0
+  class_weighting: true       # CrossEntropyLoss ponderada pela frequencia no treino
+  amp: true                   # mixed precision (float16) - acelera na GPU
+  early_stopping_patience: 6  # epocas sem ganho de macro-F1 na validacao (0 = desliga)
+  log_gpu_energy: true        # amostra potencia da GPU se nvidia-ml-py estiver disponivel
+
+models:
+  - resnet50
+  - resnet18
+  - mobilenet_v2
+  - mobilenet_v3_large
+
+efficiency:
+  latency_warmup: 20
+  latency_runs: 200
+  batched_batch_size: 64      # throughput em lote (cenario servidor)
+  cpu_threads: 4              # fixado para tornar a latencia de CPU comparavel
+
+paths:
+  results_dir: results
+  checkpoints_dir: checkpoints
+  figures_dir: figs
