@@ -103,7 +103,11 @@ def main() -> None:
         best_f1 = ckpt.get("best_f1", -1.0)
         epochs_no_improve = ckpt.get("epochs_no_improve", 0)
         if os.path.exists(history_path):
-            history = pd.read_csv(history_path).to_dict("records")
+            prev = pd.read_csv(history_path)
+            # Descarta epocas que serao refeitas: se a sessao caiu entre a
+            # escrita do CSV e a do checkpoint, a epoca N ficou no CSV mas nao
+            # no last.pt, e seria gravada duas vezes.
+            history = prev[prev["epoch"] < start_epoch].to_dict("records")
         print(f"[resume] retomando da epoca {start_epoch} (melhor macro-F1={best_f1:.4f})")
 
     if start_epoch >= cfg["train"]["epochs"]:
@@ -152,6 +156,17 @@ def main() -> None:
               f"acc {m['accuracy']:.3f} | macro-F1 {m['f1_macro']:.4f} | "
               f"{row['epoch_time_s']:.0f}s | VRAM {peak_vram:.0f}MB")
 
+        improved = m["f1_macro"] > best_f1
+        if improved:
+            best_f1 = m["f1_macro"]
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        # O estado so e montado DEPOIS de best_f1/epochs_no_improve serem
+        # atualizados. Gravar last.pt antes fazia o resume reabrir com um
+        # best_f1 defasado em uma epoca e sobrescrever best.pt com um modelo
+        # pior -- silenciosamente, sem erro nenhum.
         state = {
             "epoch": epoch, "model": model.state_dict(), "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(), "scaler": scaler.state_dict() if use_amp else None,
@@ -160,17 +175,14 @@ def main() -> None:
         }
         torch.save(state, last_ckpt)
 
-        if m["f1_macro"] > best_f1:
-            best_f1 = m["f1_macro"]
-            epochs_no_improve = 0
-            state["best_f1"] = best_f1
+        if improved:
             torch.save(state, best_ckpt)
             print(f"   novo melhor macro-F1 = {best_f1:.4f}  -> {best_ckpt}")
-        else:
-            epochs_no_improve += 1
-            if patience and epochs_no_improve >= patience:
-                print(f"[early stopping] {patience} epocas sem melhora.")
-                break
+
+        # fora do else: last.pt precisa estar gravado antes de qualquer break
+        if patience and epochs_no_improve >= patience:
+            print(f"[early stopping] {patience} epocas sem melhora.")
+            break
 
     print(f"\n[train] concluido. Melhor macro-F1 (val) = {best_f1:.4f}")
     print(f"[train] historico: {history_path}")
