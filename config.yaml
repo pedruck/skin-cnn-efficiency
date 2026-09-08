@@ -58,6 +58,10 @@ efficiency:
   batched_batch_size: 64      # throughput em lote (cenario servidor)
   cpu_threads: 4              # fixado para tornar a latencia de CPU comparavel
 
+bootstrap:
+  n_resamples: 1000           # reamostragens do conjunto de teste (0 desliga)
+  alpha: 0.05                 # 0.05 -> intervalo de 95%
+
 paths:
   results_dir: results
   checkpoints_dir: checkpoints

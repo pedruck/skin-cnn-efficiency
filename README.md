@@ -22,6 +22,7 @@ Adicionar/trocar modelos = editar a lista `models:` em [`config.yaml`](config.ya
 | **Desempenho preditivo** | acurácia, acurácia balanceada, **macro-F1** (principal), F1 ponderado, κ de Cohen, AUC macro (OvR), recall de MEL (melanoma) |
 | **Custo de hardware** | nº de parâmetros, tamanho do modelo (MB), GMACs (≈ GFLOPs/2), latência CPU e GPU (média ± desvio, p95), throughput, VRAM de pico no treino, tempo/energia de treino |
 | **Custo-benefício** | macro-F1 por GMAC e por milhão de parâmetros |
+| **Incerteza** | IC 95% do macro-F1 por *bootstrap*; comparação pareada entre modelos |
 
 Métricas sensíveis a desbalanceamento porque o ISIC 2019 é desbalanceado mesmo no
 cenário de 4 classes (NV 12.875 vs. BKL 2.624 — 4,9:1; no de 8 classes, 54:1). O
@@ -112,6 +113,7 @@ dois cenários coexistem sem se sobrescrever.
 | `results/summary.csv` | Tabela de custo-benefício |
 | `results/per_class_<modelo>.csv` | Métricas por classe |
 | `results/test_predictions_<modelo>.npz` | regenera matriz de confusão, PR, F1/classe |
+| `results/bootstrap_pairs.csv` | ΔF1 entre modelos com IC — diz quais diferenças são afirmáveis |
 | `figs/fig1_samples` … `fig8_pr_curves` | Figuras 1–8 |
 
 Figura-chave: `fig4_tradeoff` (macro-F1 × GMACs / latência / parâmetros).
@@ -120,4 +122,21 @@ Figura-chave: `fig4_tradeoff` (macro-F1 × GMACs / latência / parâmetros).
 
 `seed` e todos os hiperparâmetros ficam em `config.yaml`. Para resultados
 bit-a-bit reprodutíveis (≈10–20 % mais lento), defina `deterministic: true`.
-O ideal é repetir com ≥3 seeds e reportar média ± desvio nas métricas preditivas.
+
+## Incerteza
+
+Diferenças pequenas de macro-F1 entre arquiteturas podem ser ruído de amostragem do
+conjunto de teste. O `benchmark.py` estima isso por **bootstrap**: reamostra o teste
+com reposição `n_resamples` vezes e devolve o intervalo percentil de 95 %.
+
+A comparação entre dois modelos é **pareada** — os mesmos índices reamostrados são
+aplicados aos dois. Como ambos foram avaliados nas mesmas imagens, o pareamento
+remove a variabilidade de "quais imagens saíram" e isola a diferença entre
+arquiteturas, sendo bem mais sensível que verificar sobreposição de dois ICs
+calculados em separado. Se o IC da diferença inclui zero, **não afirme** que um
+modelo é melhor.
+
+Limitação a declarar no artigo: o bootstrap mede apenas a variabilidade de
+amostragem do teste. Variação por semente de treino exigiria repetir o treinamento
+com ≥3 seeds — o ideal, porém ~3× mais caro. O bootstrap é um piso da incerteza,
+não o total.

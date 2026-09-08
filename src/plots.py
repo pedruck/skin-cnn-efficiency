@@ -110,8 +110,15 @@ def fig_tradeoff(results_dir: str, figures_dir: str) -> None:
     fig, axes = plt.subplots(1, len(x_options), figsize=(3.4 * len(x_options), 3.2), squeeze=False)
     for ax, (col, lbl) in zip(axes[0], x_options):
         sizes = 40 + 240 * (s["params_total_m"] / s["params_total_m"].max())
+        # barras de erro do bootstrap, quando disponiveis: sem elas o leitor nao
+        # tem como julgar se dois pontos proximos sao de fato distinguiveis
+        if {"f1_macro_ci_low", "f1_macro_ci_high"} <= set(s.columns):
+            yerr = np.vstack([s["f1_macro"] - s["f1_macro_ci_low"],
+                              s["f1_macro_ci_high"] - s["f1_macro"]])
+            ax.errorbar(s[col], s["f1_macro"], yerr=yerr, fmt="none",
+                        ecolor="black", elinewidth=0.8, capsize=3, alpha=0.6, zorder=1)
         ax.scatter(s[col], s["f1_macro"], s=sizes, c=colors, alpha=0.85,
-                   edgecolors="black", linewidths=0.5)
+                   edgecolors="black", linewidths=0.5, zorder=2)
         for _, r in s.iterrows():
             ax.annotate(r["display"], (r[col], r["f1_macro"]),
                         textcoords="offset points", xytext=(6, 4), fontsize=7)
