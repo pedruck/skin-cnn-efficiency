@@ -113,11 +113,12 @@ def load_or_make_splits(frame: pd.DataFrame, val_frac: float, test_frac: float,
 def build_transforms(image_size: int, resize_before_crop: int) -> dict:
     """Treino e avaliacao compartilham o mesmo enquadramento.
 
-    Os dois caminhos fazem ``resize_before_crop`` -> recorte de ``image_size``
-    (aleatorio no treino, central na avaliacao). Avaliar com a imagem inteira
-    reduzida direto a ``image_size`` daria ao modelo um campo de visao mais
-    amplo do que ele viu treinando -- um train/eval mismatch que custa alguns
-    decimos de macro-F1 de graca.
+    Os dois caminhos fazem ``resize_before_crop`` -> recorte de ``image_size``:
+    aleatorio com escala variavel no treino, central na avaliacao. A faixa de
+    escala do treino e centrada na area que o recorte central cobre, de modo
+    que o enquadramento medio coincide. Avaliar com a imagem inteira reduzida
+    direto a ``image_size`` daria ao modelo um campo de visao mais amplo do que
+    ele viu treinando -- um train/eval mismatch que custa macro-F1 de graca.
 
     O ``Resize`` inicial tambem torna o cache de ``src.prepare_cache``
     transparente: se as imagens ja estao em ``resize_before_crop``, ele nao
@@ -125,10 +126,17 @@ def build_transforms(image_size: int, resize_before_crop: int) -> dict:
     """
     train_tfm = transforms.Compose([
         transforms.Resize((resize_before_crop, resize_before_crop)),
-        transforms.RandomCrop(image_size),
+        # Rotacao livre: imagem dermatoscopica nao tem orientacao canonica -- o
+        # aparelho encosta na pele em qualquer angulo. Vem ANTES do recorte porque
+        # girar cria cantos pretos, que o recorte seguinte descarta.
+        transforms.RandomRotation(180),
+        # scale=(0.6, 0.9) tem media 0.75, centrada nos (224/256)^2 = 76.6% de area
+        # que o CenterCrop da avaliacao cobre: adiciona invariancia a escala sem
+        # deslocar o enquadramento medio em relacao ao que o modelo vera no teste.
+        transforms.RandomResizedCrop(image_size, scale=(0.6, 0.9), ratio=(0.9, 1.1)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
         transforms.ToTensor(),
         transforms.Normalize(MEAN, STD),
     ])
