@@ -25,7 +25,7 @@ train:
   optimizer: adamw
   scheduler: cosine          # cosine | none
   warmup_epochs: 1
-  label_smoothing: 0.1      # penaliza superconfianca (train_loss colapsando)
+  label_smoothing: 0.0
   class_weighting: true       # CrossEntropyLoss ponderada pela frequencia no treino
   amp: true                   # mixed precision (float16) - acelera na GPU
   early_stopping_patience: 6  # epocas sem ganho de macro-F1 na validacao (0 = desliga)
