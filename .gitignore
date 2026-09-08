@@ -8,8 +8,11 @@ venv/
 
 # Generated artifacts (regenerate with src.train / src.benchmark / src.plots)
 checkpoints/*
+checkpoints_*/*
 results/*
+results_*/*
 figs/*
+figs_*/*
 !checkpoints/.gitkeep
 !results/.gitkeep
 !figs/.gitkeep

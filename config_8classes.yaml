@@ -1,0 +1,22 @@
+# ==========================================================================
+# Cenario completo do ISIC 2019: as 8 classes diagnosticas.
+#
+# Overlay sobre config.yaml -- declara apenas o que difere. Herda seed, todos
+# os hiperparametros de treino, a lista de modelos e a configuracao de
+# eficiencia. Isso garante que os dois cenarios diferem SO no conjunto de
+# classes; copiar o config inteiro permitiria que um ajuste de lr entrasse em
+# apenas um dos arquivos e contaminasse a comparacao sem aviso.
+#
+# Uso:
+#     python -m src.train --model resnet50 --config config_8classes.yaml
+# ==========================================================================
+
+base: config.yaml
+
+experiment: 8classes
+
+data:
+  # MEL 4522 | NV 12875 | BCC 3323 | AK 867 | BKL 2624 | DF 239 | VASC 253 | SCC 628
+  # Desbalanceamento de 54:1 entre NV e DF -- macro-F1 fica sensivel a poucas
+  # imagens das classes minusculas.
+  classes: [MEL, NV, BCC, AK, BKL, DF, VASC, SCC]

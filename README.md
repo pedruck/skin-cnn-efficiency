@@ -2,7 +2,13 @@
 
 Estudo comparativo do compromisso **desempenho × custo computacional** de arquiteturas
 CNN pré-treinadas (ImageNet) aplicadas por *transfer learning* à classificação
-multiclasse de imagens dermatoscópicas do **ISIC 2019** (8 classes).
+multiclasse de imagens dermatoscópicas do **ISIC 2019**.
+
+**Cenário padrão: 4 classes** (MEL, NV, BCC, BKL — 23.344 imagens). O ISIC 2019 completo
+tem desbalanceamento de 54:1 (NV 12.875 contra DF 239), o que deixa o macro-F1 refém de
+classes com ~36 imagens de teste. Restringir às quatro maiores derruba a razão para 4,9:1
+e preserva 92% das imagens, mantendo o melanoma. O cenário completo continua reproduzível
+com `--config config_8classes.yaml`.
 
 Modelos comparados (padrão): **ResNet-50, ResNet-18, MobileNetV2, MobileNetV3-Large**
 — duas famílias (ResNet e MobileNet), duas escalas cada, para comparação intra e entre famílias.
@@ -17,15 +23,17 @@ Adicionar/trocar modelos = editar a lista `models:` em [`config.yaml`](config.ya
 | **Custo de hardware** | nº de parâmetros, tamanho do modelo (MB), GMACs (≈ GFLOPs/2), latência CPU e GPU (média ± desvio, p95), throughput, VRAM de pico no treino, tempo/energia de treino |
 | **Custo-benefício** | macro-F1 por GMAC e por milhão de parâmetros |
 
-Métricas sensíveis a desbalanceamento porque o ISIC 2019 é fortemente desbalanceado
-(NV ≈ 12,9 k imagens vs. DF ≈ 240). O `CrossEntropyLoss` é ponderado pela frequência
-de classe no treino e o split é **estratificado 70/15/15**, persistido em
-`results/splits.csv` e reutilizado por todos os modelos.
+Métricas sensíveis a desbalanceamento porque o ISIC 2019 é desbalanceado mesmo no
+cenário de 4 classes (NV 12.875 vs. BKL 2.624 — 4,9:1; no de 8 classes, 54:1). O
+`CrossEntropyLoss` é ponderado pela frequência de classe no treino e o split é
+**estratificado 70/15/15**, persistido em `results/splits.csv` e reutilizado por todos
+os modelos do mesmo cenário.
 
 ## Estrutura
 
 ```
-config.yaml            toda a configuração do estudo (seed, split, hiperparâmetros, modelos)
+config.yaml            configuração padrão (4 classes) — seed, split, hiperparâmetros, modelos
+config_8classes.yaml   overlay com as 8 classes; herda todo o resto via `base:`
 run.ipynb              notebook driver para o Google Colab
 src/
   data.py              Dataset ISIC 2019, split estratificado, DataLoaders, pesos de classe
@@ -88,6 +96,10 @@ python -m src.train --model mobilenet_v3_large --data /caminho/isic-2019
 python -m src.benchmark --data /caminho/isic-2019
 python -m src.plots --data /caminho/isic-2019
 ```
+
+Para o cenário de 8 classes, acrescente `--config config_8classes.yaml` em **todos** os
+comandos — treino, benchmark e figuras. As saídas ficam em pastas separadas, então os
+dois cenários coexistem sem se sobrescrever.
 
 ## Saídas → artigo
 

@@ -1,7 +1,19 @@
 # ==========================================================================
-# Configuracao unica do estudo. Todos os scripts (train / benchmark / plots)
+# Configuracao padrao do estudo. Todos os scripts (train / benchmark / plots)
 # leem este arquivo. Overrides pontuais via linha de comando (ex.: --epochs).
+#
+# Cenario principal: 4 classes. O ISIC 2019 completo tem desbalanceamento de
+# 54:1 (NV 12.875 contra DF 239), o que torna o macro-F1 refem de classes com
+# ~36 imagens de teste -- tres imagens mudando de lado movem a metrica inteira.
+# Restringir as quatro classes mais numerosas derruba a razao para 4,9:1 e
+# preserva 23.344 das 25.331 imagens, mantendo o melanoma, que e o que da
+# sentido clinico ao trabalho.
+#
+# O cenario completo de 8 classes continua reproduzivel:
+#     python -m src.train --model resnet50 --config config_8classes.yaml
 # ==========================================================================
+
+experiment: 4classes        # nomeia a pasta de saidas; evita colisao entre cenarios
 
 seed: 42
 deterministic: false        # true = resultados exatamente reprodutiveis (~10-20% mais lento)
@@ -9,8 +21,11 @@ deterministic: false        # true = resultados exatamente reprodutiveis (~10-20
 data:
   dataset_slug: "salviohexia/isic-2019-skin-lesion-images-for-classification"
   data_dir: null             # preenchido por --data; se null, baixa via kagglehub
-  # ordem fixa das classes (define o indice de cada rotulo em todo o projeto)
-  classes: [MEL, NV, BCC, AK, BKL, DF, VASC, SCC]
+  # Ordem fixa das classes (define o indice de cada rotulo em todo o projeto).
+  # Contagens no ISIC 2019: MEL 4522 | NV 12875 | BCC 3323 | BKL 2624 = 23.344
+  # Fora deste cenario: AK 867 | SCC 628 | VASC 253 | DF 239
+  classes: [MEL, NV, BCC, BKL]
+  balance_per_class: null    # N por classe (subamostra antes do split); null = usa tudo
   image_size: 224
   resize_before_crop: 256
   val_fraction: 0.15
@@ -26,7 +41,7 @@ train:
   scheduler: cosine          # cosine | none
   warmup_epochs: 1
   label_smoothing: 0.0
-  class_weighting: true       # CrossEntropyLoss ponderada pela frequencia no treino
+  class_weighting: true       # 4,9:1 ainda pede ponderacao
   amp: true                   # mixed precision (float16) - acelera na GPU
   early_stopping_patience: 6  # epocas sem ganho de macro-F1 na validacao (0 = desliga)
   log_gpu_energy: true        # amostra potencia da GPU se nvidia-ml-py estiver disponivel
