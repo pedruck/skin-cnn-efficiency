@@ -8,7 +8,13 @@ from tqdm.auto import tqdm
 
 
 def train_one_epoch(model, loader, criterion, optimizer, device,
-                    scaler=None, use_amp: bool = False) -> float:
+                    scaler=None, use_amp: bool = False, log_criterion=None) -> float:
+    """Uma epoca de treino. Retorna a perda media registrada.
+
+    ``criterion`` e o que se otimiza; ``log_criterion``, se informado, e o que
+    se registra. Separar os dois permite treinar com perda ponderada por classe
+    e ainda assim registrar uma curva comparavel a da validacao.
+    """
     model.train()
     running, seen = 0.0, 0
     autocast_dev = "cuda" if device.type == "cuda" else "cpu"
@@ -21,6 +27,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device,
         with torch.autocast(device_type=autocast_dev, enabled=use_amp):
             outputs = model(images)
             loss = criterion(outputs, labels)
+            logged = loss if log_criterion is None else log_criterion(outputs, labels)
 
         if scaler is not None and scaler.is_enabled():
             scaler.scale(loss).backward()
@@ -30,7 +37,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device,
             loss.backward()
             optimizer.step()
 
-        running += loss.item() * images.size(0)
+        running += logged.item() * images.size(0)
         seen += images.size(0)
 
     return running / max(seen, 1)

@@ -77,6 +77,21 @@ def main() -> None:
     model = build_model(args.model, num_classes, pretrained=True).to(device)
     weight = class_weights.to(device) if cfg["train"]["class_weighting"] else None
     criterion = nn.CrossEntropyLoss(weight=weight, label_smoothing=cfg["train"]["label_smoothing"])
+    # Perda usada APENAS para as curvas de train_loss/val_loss: sem ponderacao de
+    # classe e sem label smoothing.
+    #
+    # Com ponderacao, a contribuicao de cada classe para a perda e n_c * N/(8*n_c),
+    # constante -- ou seja, as 8 classes pesam igual e DF (36 imagens de validacao)
+    # carrega tanto quanto NV (1931). A curva vira uma perda macro-averaged,
+    # dominada pelo ruido das classes minusculas. Alem disso, reduction='mean'
+    # normaliza pela soma dos pesos do lote, o que torna incorreto agregar entre
+    # lotes multiplicando pelo tamanho do lote.
+    #
+    # Sem ponderacao os dois problemas somem, train_loss e val_loss ficam na mesma
+    # escala (a fig3 passa a medir o gap de sobreajuste de forma interpretavel) e
+    # o valor nao muda com label_smoothing. Nada disso afeta o treino: 'criterion'
+    # continua sendo o que o otimizador minimiza.
+    monitor_criterion = nn.CrossEntropyLoss()
     optimizer = build_optimizer(model, cfg)
     scheduler = build_scheduler(optimizer, cfg)
     use_amp = bool(cfg["train"]["amp"]) and device.type == "cuda"
@@ -126,11 +141,12 @@ def main() -> None:
         if meter is not None:
             meter.__enter__()
         train_loss = train_one_epoch(model, loaders["train"], criterion, optimizer,
-                                     device, scaler, use_amp)
+                                     device, scaler, use_amp,
+                                     log_criterion=monitor_criterion)
         if meter is not None:
             meter.__exit__()
 
-        val_loss, y_true, y_pred, y_prob = evaluate(model, loaders["val"], criterion, device)
+        val_loss, y_true, y_pred, y_prob = evaluate(model, loaders["val"], monitor_criterion, device)
         scheduler.step()
 
         m = compute_metrics(y_true, y_pred, y_prob, class_names)
