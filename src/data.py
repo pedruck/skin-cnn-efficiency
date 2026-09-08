@@ -114,9 +114,8 @@ def build_transforms(image_size: int, resize_before_crop: int) -> dict:
     """Treino e avaliacao compartilham o mesmo enquadramento.
 
     Os dois caminhos fazem ``resize_before_crop`` -> recorte de ``image_size``:
-    aleatorio com escala variavel no treino, central na avaliacao. A faixa de
-    escala do treino e centrada na area que o recorte central cobre, de modo
-    que o enquadramento medio coincide. Avaliar com a imagem inteira reduzida
+    aleatorio no treino, central na avaliacao. A area recortada e exatamente a
+    mesma nos dois -- so a posicao muda. Avaliar com a imagem inteira reduzida
     direto a ``image_size`` daria ao modelo um campo de visao mais amplo do que
     ele viu treinando -- um train/eval mismatch que custa macro-F1 de graca.
 
@@ -124,26 +123,32 @@ def build_transforms(image_size: int, resize_before_crop: int) -> dict:
     transparente: se as imagens ja estao em ``resize_before_crop``, ele nao
     altera nada e o resultado e identico ao do dataset original.
     """
+    # Principio que rege este pipeline: aumentar apenas ao longo dos eixos que
+    # variam na aquisicao real (orientacao do aparelho, enquadramento, iluminacao)
+    # e nunca ao longo dos que carregam o diagnostico. Dermatoscopia e tarefa de
+    # granularidade fina -- rede pigmentar, globulos, estrias, padrao vascular --
+    # e a regra ABCD depende diretamente de Assimetria, Borda e Cor.
     train_tfm = transforms.Compose([
         transforms.Resize((resize_before_crop, resize_before_crop)),
-        # Imagem dermatoscopica nao tem orientacao canonica -- o aparelho encosta
-        # na pele em qualquer angulo -- entao rotacao e aumento de dados de graca.
-        # Apenas multiplos de 90 graus: combinados com os dois flips abaixo cobrem
-        # as 8 simetrias do quadrado (grupo diedral D4), sem cantos pretos e sem
-        # perda por interpolacao. Rotacao livre nao serve aqui: um quadrado girado
-        # em 45 graus tem quadrado inscrito de lado s/(cos+sen), ou seja apenas
-        # 50% da area util -- recortes de 60-90% pegariam o preto, artefato que a
-        # avaliacao nunca ve.
+        # A lesao nao tem orientacao canonica: o aparelho encosta na pele em
+        # qualquer angulo. Apenas multiplos de 90 graus, que com os dois flips
+        # cobrem as 8 simetrias do quadrado (grupo diedral D4) por permutacao
+        # exata de pixels -- sem cantos pretos e sem perda por interpolacao.
         transforms.RandomChoice([
             transforms.RandomRotation((a, a)) for a in (0, 90, 180, 270)
         ]),
-        # scale=(0.6, 0.9) tem media 0.75, centrada nos (224/256)^2 = 76.6% de area
-        # que o CenterCrop da avaliacao cobre: adiciona invariancia a escala sem
-        # deslocar o enquadramento medio em relacao ao que o modelo vera no teste.
-        transforms.RandomResizedCrop(image_size, scale=(0.6, 0.9), ratio=(0.9, 1.1)),
+        # Translacao de +-16 px, mesma area que o CenterCrop da avaliacao recorta.
+        # Deliberadamente NAO e RandomResizedCrop agressivo: recortar 40% da area
+        # remove a borda da lesao e a assimetria -- o "B" e o "A" do ABCD.
+        transforms.RandomCrop(image_size),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
+        # Brilho e contraste variam de verdade entre dermatoscopios e clinicas:
+        # ruido de aquisicao legitimo. Saturacao fica baixa porque intensidade de
+        # cor e parcialmente diagnostica. hue fica de fora de proposito: matiz E o
+        # diagnostico (veu azul-esbranquicado, marrom, preto, vermelho), e
+        # desloca-la corrompe evidencia em vez de criar variacao util.
+        transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.10),
         transforms.ToTensor(),
         transforms.Normalize(MEAN, STD),
     ])
