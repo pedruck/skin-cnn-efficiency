@@ -126,10 +126,17 @@ def build_transforms(image_size: int, resize_before_crop: int) -> dict:
     """
     train_tfm = transforms.Compose([
         transforms.Resize((resize_before_crop, resize_before_crop)),
-        # Rotacao livre: imagem dermatoscopica nao tem orientacao canonica -- o
-        # aparelho encosta na pele em qualquer angulo. Vem ANTES do recorte porque
-        # girar cria cantos pretos, que o recorte seguinte descarta.
-        transforms.RandomRotation(180),
+        # Imagem dermatoscopica nao tem orientacao canonica -- o aparelho encosta
+        # na pele em qualquer angulo -- entao rotacao e aumento de dados de graca.
+        # Apenas multiplos de 90 graus: combinados com os dois flips abaixo cobrem
+        # as 8 simetrias do quadrado (grupo diedral D4), sem cantos pretos e sem
+        # perda por interpolacao. Rotacao livre nao serve aqui: um quadrado girado
+        # em 45 graus tem quadrado inscrito de lado s/(cos+sen), ou seja apenas
+        # 50% da area util -- recortes de 60-90% pegariam o preto, artefato que a
+        # avaliacao nunca ve.
+        transforms.RandomChoice([
+            transforms.RandomRotation((a, a)) for a in (0, 90, 180, 270)
+        ]),
         # scale=(0.6, 0.9) tem media 0.75, centrada nos (224/256)^2 = 76.6% de area
         # que o CenterCrop da avaliacao cobre: adiciona invariancia a escala sem
         # deslocar o enquadramento medio em relacao ao que o modelo vera no teste.
