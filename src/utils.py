@@ -10,10 +10,30 @@ import torch
 import yaml
 
 
+def _deep_merge(base: dict, over: dict) -> dict:
+    """Mescla ``over`` sobre ``base`` recursivamente (dicionarios aninhados)."""
+    out = dict(base)
+    for key, value in over.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
 def load_config(path: str = "config.yaml", overrides: dict[str, Any] | None = None) -> dict:
-    """Carrega o YAML e aplica overrides com chave pontuada (ex.: {'train.epochs': 30})."""
+    """Carrega o YAML e aplica overrides com chave pontuada (ex.: {'train.epochs': 30}).
+
+    A chave ``base:`` faz o arquivo herdar de outro: o filho e mesclado sobre o
+    pai, chave a chave. Isso permite que um experimento derivado declare apenas
+    o que difere, em vez de copiar o config inteiro -- copia significaria duas
+    fontes da verdade e, na pratica, divergencia silenciosa de hiperparametros.
+    """
     with open(path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
+    base = cfg.pop("base", None)
+    if base:
+        cfg = _deep_merge(load_config(os.path.join(os.path.dirname(path) or ".", base)), cfg)
     for key, value in (overrides or {}).items():
         if value is None:
             continue

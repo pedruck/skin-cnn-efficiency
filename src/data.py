@@ -72,6 +72,24 @@ def build_master_frame(data_dir: str, classes: list[str]) -> pd.DataFrame:
     return frame
 
 
+def balance_frame(frame: pd.DataFrame, per_class: int, seed: int) -> pd.DataFrame:
+    """Subamostra exatamente ``per_class`` imagens de cada classe.
+
+    Roda ANTES do split, de modo que treino, validacao e teste herdam o
+    balanceamento. Deterministico dada a semente.
+    """
+    counts = frame["class"].value_counts()
+    if per_class > counts.min():
+        raise ValueError(
+            f"balance_per_class={per_class} excede a menor classe: "
+            f"{counts.idxmin()} tem {counts.min()} imagens")
+    rng = np.random.default_rng(seed)
+    keep = [rng.choice(frame.index[frame["class"] == c].to_numpy(),
+                       size=per_class, replace=False)
+            for c in sorted(frame["class"].unique())]
+    return frame.loc[np.concatenate(keep)].sort_index().reset_index(drop=True)
+
+
 # --------------------------------------------------------------------------- #
 # Split estratificado 70/15/15, persistido
 # --------------------------------------------------------------------------- #
@@ -167,6 +185,12 @@ def build_dataloaders(cfg: dict, data_dir: str):
     """Retorna (loaders, class_weights, class_names, splits_df)."""
     classes = list(cfg["data"]["classes"])
     frame = build_master_frame(data_dir, classes)
+
+    per_class = cfg["data"].get("balance_per_class")
+    if per_class:
+        frame = balance_frame(frame, int(per_class), cfg["seed"])
+        print(f"[data] balanceado: {per_class} imagens por classe "
+              f"({len(frame)} no total, {len(classes)} classes)")
 
     splits_path = os.path.join(cfg["paths"]["results_dir"], "splits.csv")
     splits = load_or_make_splits(
