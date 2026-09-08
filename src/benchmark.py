@@ -34,6 +34,21 @@ from .models import build_model, display_name
 from .utils import ensure_dir, get_device, load_config, resolve_data_dir, set_seed
 
 
+def _steady_vram(h: pd.DataFrame) -> float:
+    """VRAM de treino em regime permanente.
+
+    A epoca 0 registra um pico transitorio do alocador do PyTorch -- workspaces
+    do cuDNN sendo escolhidos, buffers do autograd ainda nao reutilizados -- e
+    uma retomada de sessao produz outro. Tomar o maximo captura esses artefatos
+    em vez do consumo real: na run de 4 classes a ResNet-50 marcou 3847 MB na
+    epoca 0 contra 1719 MB de regime, e a ResNet-18 1447 contra 573. A distorcao
+    nao e uniforme entre arquiteturas, entao chega a inverter a ordenacao delas.
+    A mediana das demais epocas e robusta aos dois casos.
+    """
+    v = h["peak_vram_mb"]
+    return float(v.iloc[1:].median()) if len(v) > 1 else float(v.max())
+
+
 def _history_stats(results_dir: str, model: str) -> dict:
     path = os.path.join(results_dir, f"history_{model}.csv")
     if not os.path.exists(path):
@@ -43,7 +58,7 @@ def _history_stats(results_dir: str, model: str) -> dict:
         "epochs_run": int(h["epoch"].max() + 1),
         "mean_epoch_time_s": float(h["epoch_time_s"].mean()),
         "total_train_time_s": float(h["epoch_time_s"].sum()),
-        "peak_vram_train_mb": float(h["peak_vram_mb"].max()),
+        "peak_vram_train_mb": _steady_vram(h),
         "total_train_energy_wh": float(h["gpu_energy_wh"].sum()) if h["gpu_energy_wh"].notna().any() else float("nan"),
         "best_val_f1_macro": float(h["val_f1_macro"].max()),
     }

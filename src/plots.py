@@ -182,7 +182,7 @@ def fig_efficiency_bars(results_dir: str, figures_dir: str) -> None:
         ("cpu_latency_ms_mean", "Latencia CPU (ms)"),
         ("gpu_latency_ms_mean", "Latencia GPU (ms)"),
         ("size_mb", "Tamanho (MB)"),
-        ("peak_vram_train_mb", "VRAM pico treino (MB)"),
+        ("peak_vram_train_mb", "VRAM treino (MB)"),
     ]
     metrics = [(c, lbl) for c, lbl in metrics if c in e.columns and e[c].notna().any()]
     ncol = 3
